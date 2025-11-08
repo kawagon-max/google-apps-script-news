@@ -6,7 +6,7 @@
 // ============================================
 // 環境設定（ここを変更するだけで切り替え可能）
 // ============================================
-const ENVIRONMENT = 'TEST';  // 'TEST' または 'PRODUCTION'
+const ENVIRONMENT = 'PRODUCTION';  // 'TEST' または 'PRODUCTION'
 
 // 環境別の設定
 const ENV_CONFIG = {
@@ -96,8 +96,8 @@ function cleanupOldReadArticles() {
     let deletedCount = 0;
     
     allKeys.forEach(key => {
-      // read_articles_xxx_yyyy年MM月dd日 形式のキーのみ処理
-      if (key.startsWith('read_articles_')) {
+      // read_articles_環境名_xxx_yyyy年MM月dd日 形式のキーのみ処理
+      if (key.startsWith(`read_articles_${ENVIRONMENT}_`)) {
         const dateMatch = key.match(/(\d{4})年(\d{2})月(\d{2})日$/);
         if (dateMatch) {
           const [, year, month, day] = dateMatch;
@@ -162,9 +162,9 @@ function fetchNewArticles(feedConfig, today) {
       article.link && !allReadArticles.includes(article.link)
     );
     
-    // 新着記事URLを「今日の」既読に追加
+    // 新着記事URLを「今日の」既読に追加（環境別）
     if (newArticles.length > 0) {
-      const readArticlesKeyToday = `read_articles_${feedConfig.name}_${today}`;
+      const readArticlesKeyToday = `read_articles_${ENVIRONMENT}_${feedConfig.name}_${today}`;
       const todayReadArticles = JSON.parse(PropertiesService.getScriptProperties().getProperty(readArticlesKeyToday) || '[]');
       
       const newUrls = newArticles.map(article => article.link);
@@ -188,17 +188,17 @@ function fetchNewArticles(feedConfig, today) {
 }
 
 /**
- * 今日+昨日の既読記事URL一覧を取得
+ * 今日+昨日の既読記事URL一覧を取得（環境別）
  */
 function get2DaysReadArticles(feedName, today) {
   const yesterday = getYesterdayString();
   
-  // 今日の既読記事
-  const todayKey = `read_articles_${feedName}_${today}`;
+  // 今日の既読記事（環境別）
+  const todayKey = `read_articles_${ENVIRONMENT}_${feedName}_${today}`;
   const todayArticles = JSON.parse(PropertiesService.getScriptProperties().getProperty(todayKey) || '[]');
   
-  // 昨日の既読記事
-  const yesterdayKey = `read_articles_${feedName}_${yesterday}`;
+  // 昨日の既読記事（環境別）
+  const yesterdayKey = `read_articles_${ENVIRONMENT}_${feedName}_${yesterday}`;
   const yesterdayArticles = JSON.parse(PropertiesService.getScriptProperties().getProperty(yesterdayKey) || '[]');
   
   // 合併して重複URLを除去
