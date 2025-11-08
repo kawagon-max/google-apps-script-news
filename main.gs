@@ -3,12 +3,39 @@
  * 設定は config.gs で管理
  */
 
+// ============================================
+// 環境設定（ここを変更するだけで切り替え可能）
+// ============================================
+const ENVIRONMENT = 'TEST';  // 'TEST' または 'PRODUCTION'
+
+// 環境別の設定
+const ENV_CONFIG = {
+  TEST: {
+    filePrefix: 'AI News TEST ',  // テスト環境用のファイル名
+    alertEnabled: false            // テスト時はアラート無効
+  },
+  PRODUCTION: {
+    filePrefix: 'AI News ',        // 本番環境用のファイル名
+    alertEnabled: true             // 本番はアラート有効
+  }
+};
+
+// 現在の環境設定を取得
+function getEnvironmentConfig() {
+  const config = ENV_CONFIG[ENVIRONMENT];
+  if (!config) {
+    throw new Error(`無効な環境設定: ${ENVIRONMENT}`);
+  }
+  return config;
+}
+
 /**
  * メイン実行関数 - 毎時実行推奨
  */
 function dailyAINewsUpdate() {
   try {
-    console.log('AI情報収集開始...');
+    const envConfig = getEnvironmentConfig();
+    console.log(`[${ENVIRONMENT}環境] AI情報収集開始...`);
     
     // ★ 古いプロパティを自動削除（容量制限対策）
     cleanupOldReadArticles();
@@ -40,12 +67,14 @@ function dailyAINewsUpdate() {
       }
     }
     
-    // アラート送信（AlertManagerファイルの関数を呼び出し）
-    if (totalNewArticles >= alertConfig.minArticles) {
+    // アラート送信（TEST環境では無効）
+    if (envConfig.alertEnabled && totalNewArticles >= alertConfig.minArticles) {
       AlertManager.sendUpdateAlert(totalNewArticles, newArticlesBySource, updateTime, todayDocId);
+    } else if (!envConfig.alertEnabled) {
+      console.log(`[${ENVIRONMENT}環境] アラート送信はスキップされました`);
     }
     
-    console.log(`新着記事 ${totalNewArticles}件 を取得・更新完了`);
+    console.log(`[${ENVIRONMENT}環境] 新着記事 ${totalNewArticles}件 を取得・更新完了`);
     console.log(`今日のファイル: https://docs.google.com/document/d/${todayDocId}`);
     
   } catch (error) {
@@ -341,19 +370,23 @@ function getTodayFormattedString() {
  */
 function getTodayDocumentId(todayFormatted) {
   try {
+    const envConfig = getEnvironmentConfig();
     const fileConfig = getFileConfig();
     
+    // 環境別のファイル名プレフィックスを使用
+    const fileName = `${envConfig.filePrefix}${todayFormatted}`;
+    
     // 既存のドキュメントを検索
-    const existingDocId = findExistingDocument(todayFormatted);
+    const existingDocId = findExistingDocument(fileName, fileConfig.folderId);
     
     if (existingDocId) {
-      console.log(`既存のドキュメントを使用: ${fileConfig.prefix}${todayFormatted}`);
+      console.log(`既存のドキュメントを使用: ${fileName}`);
       return existingDocId;
     }
     
     // 新しいドキュメントを作成
-    console.log(`新しいドキュメントを作成: ${fileConfig.prefix}${todayFormatted}`);
-    return createTodayDocument(todayFormatted);
+    console.log(`新しいドキュメントを作成: ${fileName}`);
+    return createTodayDocument(fileName, fileConfig.folderId);
     
   } catch (error) {
     console.error('ドキュメント取得/作成エラー:', error);
@@ -364,14 +397,11 @@ function getTodayDocumentId(todayFormatted) {
 /**
  * 既存のドキュメントを検索
  */
-function findExistingDocument(todayFormatted) {
+function findExistingDocument(fileName, folderId) {
   try {
-    const fileConfig = getFileConfig();
-    const fileName = `${fileConfig.prefix}${todayFormatted}`;
-    
     // 指定フォルダ内を検索（フォルダ指定がある場合）
-    if (fileConfig.folderId) {
-      const folder = DriveApp.getFolderById(fileConfig.folderId);
+    if (folderId) {
+      const folder = DriveApp.getFolderById(folderId);
       const files = folder.getFilesByName(fileName);
       
       if (files.hasNext()) {
@@ -402,19 +432,16 @@ function findExistingDocument(todayFormatted) {
 /**
  * 新しいドキュメントを作成
  */
-function createTodayDocument(todayFormatted) {
+function createTodayDocument(fileName, folderId) {
   try {
-    const fileConfig = getFileConfig();
-    const fileName = `${fileConfig.prefix}${todayFormatted}`;
-    
     // 新しいドキュメントを作成
     const newDoc = DocumentApp.create(fileName);
     const docId = newDoc.getId();
     
     // 指定フォルダに移動（フォルダ指定がある場合）
-    if (fileConfig.folderId) {
+    if (folderId) {
       const file = DriveApp.getFileById(docId);
-      const folder = DriveApp.getFolderById(fileConfig.folderId);
+      const folder = DriveApp.getFolderById(folderId);
       
       // ファイルをフォルダに移動
       folder.addFile(file);
@@ -437,91 +464,4 @@ function createTodayDocument(todayFormatted) {
     console.error('ドキュメント作成エラー:', error);
     throw error;
   }
-}
-
-/**
- * 1日3回実行トリガー設定
- */
-function setupDailyTrigger() {
-  // 既存のトリガーを削除
-  const triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(trigger => {
-    if (trigger.getHandlerFunction() === 'dailyAINewsUpdate') {
-      ScriptApp.deleteTrigger(trigger);
-    }
-  });
-  
-  // 新しいトリガー作成（毎日3回実行：6時、12時、18時）
-  [6, 12, 18].forEach(hour => {
-    ScriptApp.newTrigger('dailyAINewsUpdate')
-      .timeBased()
-      .everyDays(1)
-      .atHour(hour)
-      .create();
-  });
-  
-  console.log('1日3回実行トリガーを設定しました (6時、12時、18時)');
-}
-
-// ===========================================
-// テスト・デバッグ用関数
-// ===========================================
-
-/**
- * 手動テスト実行
- */
-function testUpdate() {
-  console.log('テスト実行開始...');
-  dailyAINewsUpdate();
-}
-
-/**
- * 今日の既読記事リセット
- */
-function resetTodayReadArticles() {
-  const feeds = getRSSFeeds();
-  const today = getTodayString();
-  feeds.forEach(feed => {
-    const key = `read_articles_${feed.name}_${today}`;
-    PropertiesService.getScriptProperties().deleteProperty(key);
-  });
-  console.log('今日の既読記事リストをリセットしました');
-}
-
-/**
- * 指定フィードの既読記事リセット
- */
-function resetReadArticles(feedName = 'all') {
-  const feeds = getRSSFeeds();
-  const today = getTodayString();
-  if (feedName === 'all') {
-    feeds.forEach(feed => {
-      const key = `read_articles_${feed.name}_${today}`;
-      PropertiesService.getScriptProperties().deleteProperty(key);
-    });
-  } else {
-    const key = `read_articles_${feedName}_${today}`;
-    PropertiesService.getScriptProperties().deleteProperty(key);
-  }
-  console.log(`${feedName}の既読記事リストをリセットしました`);
-}
-
-/**
- * 全ての既読記事プロパティをリセット（緊急用）
- * ★ 容量エラーが出た時に1回だけ実行してください
- */
-function emergencyResetAllProperties() {
-  const props = PropertiesService.getScriptProperties();
-  const allKeys = props.getKeys();
-  
-  let deletedCount = 0;
-  allKeys.forEach(key => {
-    if (key.startsWith('read_articles_')) {
-      props.deleteProperty(key);
-      deletedCount++;
-    }
-  });
-  
-  console.log(`${deletedCount}個のプロパティを削除しました`);
-  console.log('緊急リセット完了。これで容量エラーは解決します。');
 }

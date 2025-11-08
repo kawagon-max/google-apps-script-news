@@ -23,19 +23,26 @@ const CONFIG = {
       name: 'GIGAZINE',  // 日本の技術メディア
       url: 'https://gigazine.net/news/rss_2.0/'
     },
-    //{
-    //  name: 'AI Blog',  // Artificial Intelligence Blog
-    //  url: 'https://www.artificial-intelligence.blog/?format=rss'
-    //},
-    // 将来追加予定：
-    // {
-    //   name: 'Ledge.ai',  // AI専門メディア
-    //   url: 'https://ledge.ai/feed/' // URL要確認
-    // },
-    // {
-    //   name: 'ITmedia AI+',  // ITメディアのAI記事（フィルタリング要）
-    //   url: 'https://www.itmedia.co.jp/news/rss/rss2.xml'
-    // }
+    {
+      name: 'AI Blog',  // Artificial Intelligence Blog
+      url: 'https://www.artificial-intelligence.blog/ai-news?format=rss'
+    },
+     {
+       name: 'ITmedia 総合',  // ITメディアの記事
+       url: 'https://rss.itmedia.co.jp/rss/2.0/itmedia_all.xml'
+     },
+     {
+       name: 'ITmedia AI＋ 新着記事',  // ITメディアの記事
+       url: 'https://rss.itmedia.co.jp/rss/2.0/aiplus.xml' // URL要確認
+     },
+     {
+       name: 'CNET 新着記事',  // CNETの記事
+       url: 'https://www.cnet.com/rss/news' // URL要確認
+     },
+     {
+       name: 'GIZMODO',  // GIZMODOの記事
+       url: 'https://www.gizmodo.jp/index.xml'
+     }
   ],
   
   // アラート設定
